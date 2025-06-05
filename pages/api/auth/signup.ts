@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '@/lib/supabase';
-import bcrypt from 'bcryptjs';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { signUpWithEmail } from '@/lib/auth';
 
 export default async function handler(
   req: NextApiRequest,
@@ -20,7 +20,15 @@ export default async function handler(
       });
     }
 
-    // Check if email already exists
+    // Validate password length
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters'
+      });
+    }
+
+    // Check if email already exists in our users table
     const { data: existingUser } = await supabase
       .from('users')
       .select('email')
@@ -51,23 +59,30 @@ export default async function handler(
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Create user in Supabase Auth
+    const { session, user: authUser } = await signUpWithEmail(email, password);
+    
+    if (!authUser) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create user account'
+      });
+    }
 
-    // Create user
-    const { data: user, error: userError } = await supabase
+    // Use admin client if available to bypass RLS
+    const dbClient = supabaseAdmin || supabase;
+    
+    // Create user in our database
+    const { error: userError } = await dbClient
       .from('users')
-      .insert([
-        { email, password_hash: hashedPassword, role: 'vendor' }
-      ])
-      .select()
-      .single();
+      .insert([{ email, role: 'vendor' }]);
 
-    if (userError) throw userError;
+    if (userError) {
+      console.error('Error creating user record:', userError);
+    }
 
     // Create store
-    const { data: store, error: storeError } = await supabase
+    const { data: store, error: storeError } = await dbClient
       .from('stores')
       .insert([
         {
@@ -84,23 +99,22 @@ export default async function handler(
 
     if (storeError) throw storeError;
 
-    // Create JWT token
-    const token = Buffer.from(JSON.stringify({
-      userId: email,
-      storeId: store.id,
-      exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-    })).toString('base64');
-
-    // Set cookie
-    res.setHeader('Set-Cookie', `auth=${token}; Path=/; HttpOnly; Max-Age=86400; SameSite=Strict`);
+    if (session) {
+      // Set the session cookies if we have a session
+      res.setHeader('Set-Cookie', `sb-access-token=${session.access_token}; Path=/; HttpOnly; Max-Age=${session.expires_in}; SameSite=Strict`);
+      res.setHeader('Set-Cookie', `sb-refresh-token=${session.refresh_token}; Path=/; HttpOnly; Max-Age=${session.expires_in * 2}; SameSite=Strict`);
+    }
 
     return res.status(201).json({
       success: true,
-      user: { email },
+      user: { email, role: 'vendor' },
       store: { id: store.id, name: store.name, subdomain: store.subdomain }
     });
   } catch (error: any) {
     console.error('Signup error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'An unexpected error occurred'
+    });
   }
 }

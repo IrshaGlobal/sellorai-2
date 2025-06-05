@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { isAuthenticated } from '@/lib/auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
+  apiVersion: '2025-05-28.basil' as any,
 });
 
 export default async function handler(
@@ -16,7 +16,7 @@ export default async function handler(
   }
 
   // Verify authentication
-  const user = isAuthenticated(req);
+  const user = await isAuthenticated(req);
   if (!user) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }

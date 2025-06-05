@@ -56,7 +56,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (productId && typeof productId === 'string') {
       // In a real implementation, this would fetch from an API
-      setProduct(mockProducts[productId]);
+      setProduct(mockProducts[productId as keyof typeof mockProducts]);
       setIsLoading(false);
     }
   }, [productId]);

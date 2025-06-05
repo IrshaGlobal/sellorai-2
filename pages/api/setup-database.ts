@@ -41,12 +41,18 @@ export default async function handler(
           stripe_customer_id VARCHAR(255),
           shipping_rate DECIMAL(10,2) DEFAULT 5.00,
           free_shipping_threshold DECIMAL(10,2),
+          refund_policy TEXT,
+          privacy_policy TEXT,
+          terms_of_service TEXT,
           allow_cod BOOLEAN DEFAULT TRUE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `
     });
+    
+    // Force refresh schema cache
+    await supabase.rpc('refresh_schema_cache');
 
     // Create demo account
     const { data: authUser, error: authError } = await supabase.auth.signUp({

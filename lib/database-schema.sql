@@ -72,7 +72,6 @@ CREATE TABLE order_items (
 -- Users table
 CREATE TABLE users (
   email VARCHAR(255) PRIMARY KEY,
-  password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'vendor', -- 'admin', 'vendor'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

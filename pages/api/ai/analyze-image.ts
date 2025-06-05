@@ -35,7 +35,7 @@ export default async function handler(
     });
 
     // Get image file
-    const imageFile = files.image as formidable.File;
+    const imageFile = Array.isArray(files.image) ? files.image[0] : files.image;
     
     if (!imageFile) {
       return res.status(400).json({ error: 'No image provided' });

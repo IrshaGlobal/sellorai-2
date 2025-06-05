@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Geist } from 'next/font/google';
+import { useAuth } from '@/lib/context/AuthContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -11,6 +12,7 @@ const geistSans = Geist({
 
 export default function Signup() {
   const router = useRouter();
+  const { signUp } = useAuth();
   const [storeName, setStoreName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +32,22 @@ export default function Signup() {
     setIsLoading(true);
     setError('');
     
+    // Validate password length
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      setIsLoading(false);
+      return;
+    }
+    
     try {
+      // Sign up using our auth context
+      const { error: signUpError } = await signUp(email, password);
+      
+      if (signUpError) {
+        throw signUpError;
+      }
+      
+      // Call our API to create the store and sync user data
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
@@ -39,10 +56,10 @@ export default function Signup() {
         body: JSON.stringify({ storeName, email, password }),
       });
       
-      const data = await response.json();
+      const responseData = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.message || 'Signup failed');
+        throw new Error(responseData.message || 'Signup failed');
       }
       
       // Redirect to dashboard on successful signup

@@ -5,14 +5,12 @@ const nextConfig = {
     domains: ['localhost', 'sellor.ai'],
   },
   // Fix for HMR issues
-  webpack: (config) => {
+  webpack: (config: any) => {
     config.infrastructureLogging = {
       level: 'error',
     };
     return config;
   },
-  // Suppress hydration warnings
-  suppressHydrationWarning: true,
   // Prevent automatic redirects to login
   async redirects() {
     return [];

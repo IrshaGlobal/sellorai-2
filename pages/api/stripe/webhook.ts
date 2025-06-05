@@ -12,7 +12,7 @@ export const config = {
 };
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
+  apiVersion: '2025-05-28.basil' as any,
 });
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
@@ -39,19 +39,19 @@ export default async function handler(
     // Handle the event
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object);
+        await handlePaymentIntentSucceeded(event.data.object as any);
         break;
       case 'checkout.session.completed':
-        await handleCheckoutSessionCompleted(event.data.object);
+        await handleCheckoutSessionCompleted(event.data.object as any);
         break;
       case 'invoice.paid':
-        await handleInvoicePaid(event.data.object);
+        await handleInvoicePaid(event.data.object as any);
         break;
       case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object);
+        await handleSubscriptionUpdated(event.data.object as any);
         break;
       case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object);
+        await handleSubscriptionDeleted(event.data.object as any);
         break;
       default:
         console.log(`Unhandled event type ${event.type}`);
@@ -64,7 +64,7 @@ export default async function handler(
   }
 }
 
-async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+async function handlePaymentIntentSucceeded(paymentIntent: any) {
   try {
     // Extract metadata
     const storeId = paymentIntent.metadata.storeId;
@@ -136,7 +136,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
   }
 }
 
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutSessionCompleted(session: any) {
   try {
     // Check if this is a subscription checkout
     if (session.mode !== 'subscription' || !session.subscription) {
@@ -149,7 +149,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     }
 
     // Get subscription details
-    const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+    const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as any;
 
     // Create subscription record in database
     await supabase.from('subscriptions').insert({
@@ -169,14 +169,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   }
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
+async function handleInvoicePaid(invoice: any) {
   try {
     if (!invoice.subscription) {
       return;
     }
 
     // Get subscription
-    const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+    const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string) as any;
 
     // Find store by customer ID
     const { data: store } = await supabase
@@ -206,7 +206,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   }
 }
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdated(subscription: any) {
   try {
     // Update subscription record
     await supabase
@@ -226,7 +226,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(subscription: any) {
   try {
     // Update subscription record
     await supabase

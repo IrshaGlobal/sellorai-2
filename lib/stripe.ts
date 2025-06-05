@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2025-05-28.basil' as any,
 });
 
 export async function createPaymentIntent(amount: number, currency: string = 'usd', metadata: any = {}) {

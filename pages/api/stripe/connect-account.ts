@@ -12,7 +12,7 @@ export default async function handler(
   }
 
   // Verify authentication
-  const user = isAuthenticated(req);
+  const user = await isAuthenticated(req);
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '@/lib/supabase';
-import bcrypt from 'bcryptjs';
+import { signInWithEmail } from '@/lib/auth';
 
 export default async function handler(
   req: NextApiRequest,
@@ -17,21 +17,44 @@ export default async function handler(
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
+    try {
+      // Authenticate with Supabase Auth
+      const { session } = await signInWithEmail(email, password);
+      
+      if (!session) {
+        return res.status(401).json({ success: false, message: 'Authentication failed' });
+      }
+      
+      // Set the session cookie
+      res.setHeader('Set-Cookie', `sb-access-token=${session.access_token}; Path=/; HttpOnly; Max-Age=${session.expires_in}; SameSite=Strict`);
+      res.setHeader('Set-Cookie', `sb-refresh-token=${session.refresh_token}; Path=/; HttpOnly; Max-Age=${session.expires_in * 2}; SameSite=Strict`);
+    } catch (authError: any) {
+      console.error('Authentication error:', authError);
+      return res.status(401).json({ success: false, message: authError.message || 'Invalid email or password' });
+    }
+
     // Get user from database
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('email, password_hash, role')
+      .select('email, role')
       .eq('email', email)
       .single();
 
-    if (userError || !user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
-    }
-
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    if (userError) {
+      // If user doesn't exist in our custom table, create it
+      if (userError.code === 'PGRST116') {
+        const { data: newUser, error: createError } = await supabase
+          .from('users')
+          .insert([{ email, role: 'vendor' }])
+          .select()
+          .single();
+          
+        if (createError) {
+          throw createError;
+        }
+      } else {
+        throw userError;
+      }
     }
 
     // Get user's store
@@ -41,24 +64,13 @@ export default async function handler(
       .eq('user_id', email)
       .single();
 
-    // Create JWT token
-    const token = Buffer.from(JSON.stringify({
-      userId: email,
-      storeId: store?.id,
-      role: user.role,
-      exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-    })).toString('base64');
-
-    // Set cookie
-    res.setHeader('Set-Cookie', `auth=${token}; Path=/; HttpOnly; Max-Age=86400; SameSite=Strict`);
-
     return res.status(200).json({
       success: true,
-      user: { email, role: user.role },
+      user: { email, role: user?.role || 'vendor' },
       store: store ? { id: store.id, name: store.name, subdomain: store.subdomain } : null
     });
   } catch (error: any) {
     console.error('Login error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message || 'An unexpected error occurred' });
   }
 }
