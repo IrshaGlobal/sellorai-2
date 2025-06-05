@@ -17,12 +17,14 @@ export default async function handler(
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
+    let session;
     try {
       // Authenticate with Supabase Auth
-      const { session } = await signInWithEmail(email, password);
+      const authResponse = await signInWithEmail(email, password);
+      session = authResponse.session;
       
-      if (!session) {
-        return res.status(401).json({ success: false, message: 'Authentication failed' });
+      if (!session || !session.user) { // Also check session.user
+        return res.status(401).json({ success: false, message: 'Authentication failed or user data missing' });
       }
       
       // Set the session cookie
@@ -33,43 +35,63 @@ export default async function handler(
       return res.status(401).json({ success: false, message: authError.message || 'Invalid email or password' });
     }
 
-    // Get user from database
-    const { data: user, error: userError } = await supabase
+    const supabaseUser = session.user;
+    let appUser; // This will hold the user from our 'users' table
+
+    // Get user from our database using UUID
+    const { data: existingAppUser, error: userFetchError } = await supabase
       .from('users')
-      .select('email, role')
-      .eq('email', email)
+      .select('id, email, role')
+      .eq('id', supabaseUser.id)
       .single();
 
-    if (userError) {
-      // If user doesn't exist in our custom table, create it
-      if (userError.code === 'PGRST116') {
-        const { data: newUser, error: createError } = await supabase
+    if (userFetchError) {
+      if (userFetchError.code === 'PGRST116') { // "No rows found"
+        // User exists in Supabase Auth but not in our 'users' table, so create them
+        const { data: newAppUser, error: createError } = await supabase
           .from('users')
-          .insert([{ email, role: 'vendor' }])
-          .select()
+          .insert([{ id: supabaseUser.id, email: supabaseUser.email, role: 'vendor' }])
+          .select('id, email, role')
           .single();
           
         if (createError) {
-          throw createError;
+          console.error('Error creating user record in our DB:', createError);
+          return res.status(500).json({ success: false, message: 'Failed to initialize user account.' });
         }
+        appUser = newAppUser;
       } else {
-        throw userError;
+        // Another error occurred fetching the user
+        console.error('Error fetching user from our DB:', userFetchError);
+        return res.status(500).json({ success: false, message: 'Failed to retrieve user data.' });
       }
+    } else {
+      appUser = existingAppUser;
     }
 
-    // Get user's store
+    if (!appUser) {
+      // Should not happen if logic above is correct
+      console.error('User object (appUser) is null after fetch/create.');
+      return res.status(500).json({ success: false, message: 'Failed to obtain user details.' });
+    }
+
+    // Get user's store using UUID
     const { data: store, error: storeError } = await supabase
       .from('stores')
       .select('id, name, subdomain')
-      .eq('user_id', email)
+      .eq('user_id', supabaseUser.id) // Use supabaseUser.id (UUID)
       .single();
+
+    // storeError is not necessarily critical, user might not have a store yet or it's a different issue.
+    if (storeError && storeError.code !== 'PGRST116') {
+        console.warn('Error fetching store:', storeError.message);
+    }
 
     return res.status(200).json({
       success: true,
-      user: { email, role: user?.role || 'vendor' },
+      user: { email: appUser.email, role: appUser.role }, // Use email and role from appUser
       store: store ? { id: store.id, name: store.name, subdomain: store.subdomain } : null
     });
-  } catch (error: any) {
+  } catch (error: any) { // Catch any other unexpected errors
     console.error('Login error:', error);
     return res.status(500).json({ success: false, message: error.message || 'An unexpected error occurred' });
   }

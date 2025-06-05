@@ -1,5 +1,7 @@
 -- Database schema for sellor.ai
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Stores table
 CREATE TABLE stores (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -10,7 +12,7 @@ CREATE TABLE stores (
   primary_color VARCHAR(7) DEFAULT '#3B82F6',
   description TEXT,
   contact_email VARCHAR(255) NOT NULL,
-  user_id VARCHAR(255) NOT NULL,
+  user_id UUID NOT NULL, -- Changed from VARCHAR(255)
   stripe_account_id VARCHAR(255),
   stripe_customer_id VARCHAR(255),
   shipping_rate DECIMAL(10,2) DEFAULT 5.00,
@@ -71,7 +73,8 @@ CREATE TABLE order_items (
 
 -- Users table
 CREATE TABLE users (
-  email VARCHAR(255) PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- New primary key
+  email VARCHAR(255) NOT NULL UNIQUE, -- Email is now unique and not null
   role VARCHAR(20) NOT NULL DEFAULT 'vendor', -- 'admin', 'vendor'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -91,7 +94,11 @@ CREATE TABLE subscriptions (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Add foreign key constraints
+ALTER TABLE stores ADD CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id);
+
 -- Create indexes for performance
+CREATE INDEX idx_stores_user_id ON stores(user_id); -- Ensure user_id on stores is indexed
 CREATE INDEX idx_products_store_id ON products(store_id);
 CREATE INDEX idx_orders_store_id ON orders(store_id);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);

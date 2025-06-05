@@ -73,12 +73,27 @@ export default async function handler(
     const dbClient = supabaseAdmin || supabase;
     
     // Create user in our database
+    // Ensure authUser and its properties are available
+    if (!authUser || !authUser.id || !authUser.email) {
+      console.error('Auth user data is missing after signup.');
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve complete user information after signup.'
+      });
+    }
+
     const { error: userError } = await dbClient
       .from('users')
-      .insert([{ email, role: 'vendor' }]);
+      .insert([{ id: authUser.id, email: authUser.email, role: 'vendor' }]);
 
     if (userError) {
       console.error('Error creating user record:', userError);
+      // It's possible the user was created in Auth but not in our DB.
+      // Potentially add cleanup logic for Supabase Auth user here if critical.
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to save user details.'
+      });
     }
 
     // Create store
@@ -88,8 +103,8 @@ export default async function handler(
         {
           name: storeName,
           subdomain,
-          contact_email: email,
-          user_id: email,
+          contact_email: authUser.email, // Use authUser.email for consistency
+          user_id: authUser.id, // Use authUser.id (UUID)
           description: `Welcome to ${storeName}!`,
           primary_color: '#3B82F6'
         }
