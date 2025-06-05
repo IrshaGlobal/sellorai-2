@@ -30,8 +30,8 @@ export async function isAuthenticated(req: NextApiRequest): Promise<AuthUser | n
         let userDetails;
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('email, role')
-          .eq('email', user.email)
+          .select('id, email, role') // Select id and email as well
+          .eq('id', user.id) // Query by user.id (UUID)
           .single();
           
         if (userError || !userData) {
@@ -39,8 +39,8 @@ export async function isAuthenticated(req: NextApiRequest): Promise<AuthUser | n
           try {
             const { data: newUser, error: createError } = await supabase
               .from('users')
-              .insert([{ email: user.email, role: 'vendor' }])
-              .select()
+              .insert([{ id: user.id, email: user.email, role: 'vendor' }]) // Insert with id (UUID) and email
+              .select('id, email, role') // Select the same fields
               .single();
               
             if (createError) {
@@ -61,7 +61,7 @@ export async function isAuthenticated(req: NextApiRequest): Promise<AuthUser | n
         const { data: storeData } = await supabase
           .from('stores')
           .select('id')
-          .eq('user_id', user.email)
+          .eq('user_id', user.id) // Query by user.id (UUID)
           .single();
           
         return {
@@ -78,8 +78,8 @@ export async function isAuthenticated(req: NextApiRequest): Promise<AuthUser | n
     let userDetails;
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('email, role')
-      .eq('email', session.user.email)
+      .select('id, email, role') // Select id and email as well
+      .eq('id', session.user.id) // Query by session.user.id (UUID)
       .single();
       
     if (userError || !userData) {
@@ -87,8 +87,8 @@ export async function isAuthenticated(req: NextApiRequest): Promise<AuthUser | n
       try {
         const { data: newUser, error: createError } = await supabase
           .from('users')
-          .insert([{ email: session.user.email, role: 'vendor' }])
-          .select()
+          .insert([{ id: session.user.id, email: session.user.email, role: 'vendor' }]) // Insert with id (UUID) and email
+          .select('id, email, role') // Select the same fields
           .single();
           
         if (createError) {
@@ -109,7 +109,7 @@ export async function isAuthenticated(req: NextApiRequest): Promise<AuthUser | n
     const { data: storeData } = await supabase
       .from('stores')
       .select('id')
-      .eq('user_id', session.user.email)
+      .eq('user_id', session.user.id) // Query by session.user.id (UUID)
       .single();
       
     return {
